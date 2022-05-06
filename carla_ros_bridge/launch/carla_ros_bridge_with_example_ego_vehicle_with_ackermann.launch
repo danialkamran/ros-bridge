@@ -5,14 +5,11 @@
   <arg name='port' default='2000'/>
   <arg name='timeout' default='10'/>
    <param name="/use_sim_time" value="true" />
-  <arg name="target_speed" default="55"/> <!-- target speed in km/h that the agent tries to follow -->
 
   <!-- Ego vehicle -->
   <arg name='role_name' default='ego_vehicle'/>
   <arg name="vehicle_filter" default='vehicle.*'/>
-  <!-- Put the starting spawn point in Carla map coordinate (-200.5, -84.1, .7, 0, 0, 20.1) -->
-
-  <arg name="spawn_point" default="-113.3, -51.5, .7, 0, 0, 20."/><!-- use comma separated format "x,y,z,roll,pitch,yaw" -->
+  <arg name="spawn_point" default="-200.5, -84.1, .7, 0, 0, 20.1"/><!-- use comma separated format "x,y,z,roll,pitch,yaw" -->
 
   <!-- Map to load on startup (either a predefined CARLA town (e.g. 'Town01'), or a OpenDRIVE map file) -->
   <arg name='town' default='/home/kamran/programming/carla_coop/OpenCDA/opencda/assets/2lane_freeway_simplified/2lane_freeway_simplified.xodr'/>
@@ -33,7 +30,6 @@
     <arg name='passive' value='$(arg passive)'/>
     <arg name='synchronous_mode_wait_for_vehicle_control_command' value='$(arg synchronous_mode_wait_for_vehicle_control_command)'/>
     <arg name='fixed_delta_seconds' value='$(arg fixed_delta_seconds)'/>
-    <arg name='ego_vehicle_role_name' value='$(arg role_name)'/>
   </include>
 
   <!-- the ego vehicle, that will be controlled by an agent (e.g. carla_ad_agent) -->
@@ -47,24 +43,12 @@
   <include file="$(find carla_manual_control)/launch/carla_manual_control.launch">
     <arg name='role_name' value='$(arg role_name)'/>
   </include>
-  <!-- Provide a route and access to the CARLA waypoint API (required by carla_ad_agent) -->
-  <include file="$(find carla_waypoint_publisher)/launch/carla_waypoint_publisher.launch">
-    <arg name='host' value='$(arg host)'/>
-    <arg name='port' value='$(arg port)'/>
-    <arg name='timeout' value='$(arg timeout)'/>
-    <arg name='role_name' value='$(arg role_name)'/>
-  </include>
+
+
+  <include file="$(find carla_ackermann_control)/launch/carla_ackermann_control.launch"/>
 
     <!-- Rviz visualization-->
     <node pkg="rviz" type="rviz" name="rviz" args="-d $(find carla_ad_demo)/config/carla_ad_demo.rviz" required="true" output="screen">
       <remap from="carla/ego_vehicle/spectator_pose" to="/carla/ego_vehicle/rgb_view/control/set_transform"/>
     </node>
-
-  <!-- The carla local planner to control the ego vehicle -->
-  <include file="$(find carla_ad_agent)/launch/carla_only_local_planner.launch">
-    <arg name="role_name" value="$(arg role_name)" />
-  </include>
-
-    <!-- Publish the target speed -->
-    <node pkg="rostopic" type="rostopic" name="rostopic" args="pub /carla/$(arg role_name)/speed_command std_msgs/Float64 $(arg target_speed)"/>
 </launch>

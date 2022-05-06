@@ -12,7 +12,7 @@ handle a odom sensor
 from carla_ros_bridge.pseudo_actor import PseudoActor
 
 from nav_msgs.msg import Odometry
-
+from automated_driving_msgs.msg import MotionState
 
 class OdometrySensor(PseudoActor):
 
@@ -44,7 +44,9 @@ class OdometrySensor(PseudoActor):
         self.odometry_publisher = node.new_publisher(Odometry,
                                                      self.get_topic_prefix(),
                                                      qos_profile=10)
-
+        self.motion_state_publisher = node.new_publisher(MotionState,
+                                                     "/carla/motion_state",
+                                                     qos_profile=10)
     def destroy(self):
         super(OdometrySensor, self).destroy()
         self.node.destroy_publisher(self.odometry_publisher)
@@ -72,3 +74,11 @@ class OdometrySensor(PseudoActor):
                 "OdometrySensor could not publish. parent actor {} not found".format(self.parent.uid))
             return
         self.odometry_publisher.publish(odometry)
+
+        #publish motion state
+        motion_state = MotionState(header=self.parent.get_msg_header("map", timestamp=timestamp))
+        motion_state.child_frame_id = "object0"
+        motion_state.pose.pose = self.parent.get_current_ros_pose()
+        motion_state.twist.twist = self.parent.get_current_ros_twist_rotated()
+        self.motion_state_publisher.publish(motion_state)
+

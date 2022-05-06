@@ -62,7 +62,7 @@ class LocalPlanner(CompatibleNode):
         self._current_pose = None
         self._current_speed = None
         self._target_speed = 0.0
-
+        self._target_pose = None
         self._buffer_size = 5
         self._waypoints_queue = collections.deque(maxlen=20000)
         self._waypoint_buffer = collections.deque(maxlen=self._buffer_size)
@@ -75,14 +75,14 @@ class LocalPlanner(CompatibleNode):
             qos_profile=10)
         self._path_subscriber = self.new_subscription(
             Path,
-            "/carla/{}/waypoints".format(role_name),
+            "/2d_pipeline/trajectory_to_be_controlled_lon".format(role_name),
             self.path_cb,
             QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
-        self._target_speed_subscriber = self.new_subscription(
-            Float64,
-            "/carla/{}/speed_command".format(role_name),
-            self.target_speed_cb,
-            QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
+        # self._target_speed_subscriber = self.new_subscription(
+        #     Float64,
+        #     "/carla/{}/speed_command".format(role_name),
+        #     self.target_speed_cb,
+        #     QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL))
 
         # publishers
         self._target_pose_publisher = self.new_publisher(
@@ -105,15 +105,33 @@ class LocalPlanner(CompatibleNode):
                                             odometry_msg.twist.twist.linear.y ** 2 +
                                             odometry_msg.twist.twist.linear.z ** 2) * 3.6
 
-    def target_speed_cb(self, target_speed_msg):
-        with self.data_lock:
-            self._target_speed = target_speed_msg.data
+    # def target_speed_cb(self, target_speed_msg):
+    #     with self.data_lock:
+    #         self._target_speed = target_speed_msg.data
 
     def path_cb(self, path_msg):
         with self.data_lock:
             self._waypoint_buffer.clear()
             self._waypoints_queue.clear()
             self._waypoints_queue.extend([pose.pose for pose in path_msg.poses])
+            goal_index = 10
+            dist = math.sqrt((self._waypoints_queue[goal_index].position.x - self._waypoints_queue[1].position.x)**2 +
+                             (self._waypoints_queue[goal_index].position.y - self._waypoints_queue[1].position.y)**2 +
+                             (self._waypoints_queue[goal_index].position.z - self._waypoints_queue[1].position.z)**2 )
+            time_diff = path_msg.poses[goal_index].header.stamp - path_msg.poses[1].header.stamp
+            time_diff = time_diff.to_sec();
+            if time_diff>0.001:
+                self._target_speed = dist / time_diff
+                self._target_speed *= 3.6 #it should be in KM/H
+            else:
+                self._target_speed = 0.0
+            print("dist: {}, time: {}".format(dist, time_diff, self._target_speed))
+            target_pose_time = 1.0
+            for pose in path_msg.poses:
+                if (pose.header.stamp - path_msg.header.stamp).to_sec()>target_pose_time:
+                    self._target_pose = pose.pose
+                    break
+
 
     def pose_to_marker_msg(self, pose):
         marker_msg = Marker()
@@ -137,27 +155,31 @@ class LocalPlanner(CompatibleNode):
                 self.loginfo("Waiting for a route...")
                 self.emergency_stop()
                 return
-
+            #print("Carla local planner: target speed: {}".format(self._target_speed))
             # when target speed is 0, brake.
+            # target waypoint
+            #target_pose = self._waypoints_queue[6]#Assuming the first one is the point behind, the second one is close to current pose and the third is target pose
+
+            #des_dist = math.sqrt()
+
+
             if self._target_speed == 0.0:
                 self.emergency_stop()
                 return
 
             #   Buffering the waypoints
-            if not self._waypoint_buffer:
-                for i in range(self._buffer_size):
-                    if self._waypoints_queue:
-                        self._waypoint_buffer.append(self._waypoints_queue.popleft())
-                    else:
-                        break
+            # if not self._waypoint_buffer:
+            #     for i in range(self._buffer_size):
+            #         if self._waypoints_queue:
+            #             self._waypoint_buffer.append(self._waypoints_queue.popleft())
+            #         else:
+            #             break
 
-            # target waypoint
-            target_pose = self._waypoint_buffer[0]
-            self._target_pose_publisher.publish(self.pose_to_marker_msg(target_pose))
+            self._target_pose_publisher.publish(self.pose_to_marker_msg(self._target_pose))
 
             # move using PID controllers
             control_msg = self._vehicle_controller.run_step(
-                self._target_speed, self._current_speed, self._current_pose, target_pose)
+                self._target_speed, self._current_speed, self._current_pose, self._target_pose)
 
             # purge the queue of obsolete waypoints
             max_index = -1

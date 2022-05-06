@@ -79,7 +79,7 @@ class ActorControl(PseudoActor):
         return "actor.pseudo.control"
 
     def on_pose(self, pose):
-        if self.parent and self.parent.carla_actor.is_alive:
+        if self.parent and self.parent.carla_actor and self.parent.carla_actor.is_alive:
             self.parent.carla_actor.set_transform(trans.ros_pose_to_carla_transform(pose))
             if isinstance(self.parent, Sensor):
                 self.parent.relative_spawn_pose = pose

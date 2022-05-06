@@ -14,7 +14,7 @@ from carla_ros_bridge.vehicle import Vehicle
 from carla_ros_bridge.walker import Walker
 
 from derived_object_msgs.msg import ObjectArray
-
+from automated_driving_msgs.msg import ObjectState, ObjectStateArray
 
 class ObjectSensor(PseudoActor):
 
@@ -46,7 +46,9 @@ class ObjectSensor(PseudoActor):
         self.object_publisher = node.new_publisher(ObjectArray,
                                                    self.get_topic_prefix(),
                                                    qos_profile=10)
-
+        self.mrt_object_publisher = node.new_publisher(ObjectStateArray,
+                                                   "/perception/sceneshot/objects_tracked",
+                                                   qos_profile=10)
     def destroy(self):
         """
         Function to destroy this object.
@@ -72,7 +74,10 @@ class ObjectSensor(PseudoActor):
         :return:
         """
         ros_objects = ObjectArray()
+        mrt_objects = ObjectStateArray()
         ros_objects.header = self.get_msg_header(frame_id="map", timestamp=timestamp)
+        mrt_objects.header = self.get_msg_header(frame_id="map", timestamp=timestamp)
+
         for actor_id in self.actor_list.keys():
             # currently only Vehicles and Walkers are added to the object array
             if self.parent is None or self.parent.uid != actor_id:
@@ -82,3 +87,4 @@ class ObjectSensor(PseudoActor):
                 elif isinstance(actor, Walker):
                     ros_objects.objects.append(actor.get_object_info())
         self.object_publisher.publish(ros_objects)
+        self.mrt_object_publisher.publish(mrt_objects)

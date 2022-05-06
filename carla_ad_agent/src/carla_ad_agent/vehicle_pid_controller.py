@@ -93,12 +93,14 @@ class PIDLongitudinalController(object):  # pylint: disable=too-few-public-metho
         :param current_speed: current speed of the vehicle in Km/h
         :return: throttle control in the range [0, 1]
         """
+        print("current sp: {} target sp: {}".format(current_speed, target_speed))
         previous_error = self.error
         self.error = target_speed - current_speed
         # restrict integral term to avoid integral windup
         self.error_integral = np.clip(self.error_integral + self.error, -40.0, 40.0)
         self.error_derivative = self.error - previous_error
         output = self._K_P * self.error + self._K_I * self.error_integral + self._K_D * self.error_derivative
+        print("error {} error i {} error d {} output: {}".format(self.error, self.error_integral, self.error_derivative, output))
         return np.clip(output, 0.0, 1.0)
 
 

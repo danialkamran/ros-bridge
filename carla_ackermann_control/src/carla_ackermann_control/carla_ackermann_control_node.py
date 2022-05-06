@@ -292,6 +292,8 @@ class CarlaAckermannControl(CompatibleNode):
         :type ros_ackermann_drive: ackermann_msgs.AckermannDrive
         :return:
         """
+        print("got ackermann message")
+        print(ros_ackermann_drive)
         self.last_ackermann_msg_received_sec = self.get_time()
         # set target values
         self.set_target_steering_angle(ros_ackermann_drive.steering_angle)
